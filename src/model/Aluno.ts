@@ -262,38 +262,33 @@ class Aluno {
     */
     // Recebe um objeto Aluno completo e tenta inseri-lo no banco de dados
     static async cadastrarAluno(aluno: Aluno): Promise<boolean> {
-        try {
-            // Query SQL de inserção — os "$1", "$2"... são placeholders substituídos pelos valores reais
-            // "RETURNING id_aluno" faz o banco retornar o ID gerado automaticamente após o INSERT
-            const queryInsertAluno = `INSERT INTO Aluno (nome, sobrenome, data_nascimento, endereco, email, celular)
-                                            VALUES ('$1','$2','$3','$4','$5','$6') RETURNING id_aluno;`;
+    try {
+        const queryInsertAluno = `
+            INSERT INTO Aluno (nome, sobrenome, data_nascimento, endereco, email, celular)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING id_aluno;
+        `;
 
-            // Executa a query passando os valores do objeto aluno
-            // .toUpperCase() converte texto para maiúsculas; .toLowerCase() converte para minúsculas
-            const result = await database.query(queryInsertAluno, [aluno.getNome().toUpperCase(),
-            aluno.getSobrenome().toUpperCase(),     // Sobrenome em maiúsculas
-            aluno.getDataNascimento(),              // Data de nascimento sem transformação
-            aluno.getEndereco().toUpperCase(),      // Endereço em maiúsculas
-            aluno.getEmail().toLowerCase(),         // E-mail em minúsculas
-            aluno.getCelular()]);                   // Celular sem transformação
+        const result = await database.query(queryInsertAluno, [
+            aluno.getNome().toUpperCase(),
+            aluno.getSobrenome().toUpperCase(),
+            aluno.getDataNascimento(),
+            aluno.getEndereco().toUpperCase(),
+            aluno.getEmail().toLowerCase(),
+            aluno.getCelular()
+        ]);
 
-            // Verifica se o banco retornou pelo menos uma linha (ou seja, o INSERT funcionou)
-            if (result.rows.length > 0) {
-                // Exibe no console o ID do aluno recém-cadastrado
-                console.log(`Aluno cadastrado com sucesso. ID: ${result.rows[0].id_aluno}`);
-                // Retorna true para indicar sucesso
-                return true;
-            }
-
-            // Se nenhuma linha foi retornada, o cadastro não funcionou — retorna false
-            return false;
-        } catch (error) {
-            // Captura e exibe qualquer erro ocorrido durante o cadastro
-            console.error(`Erro ao cadastrar aluno: ${error}`);
-            // Retorna false indicando falha
-            return false;
+        if (result.rows.length > 0) {
+            console.log(`Aluno cadastrado com sucesso. ID: ${result.rows[0].id_aluno}`);
+            return true;
         }
+
+        return false;
+    } catch (error) {
+        console.error(`Erro ao cadastrar aluno: ${error}`);
+        return false;
     }
+}
 
     /**
     * Remove um aluno do banco de dados
