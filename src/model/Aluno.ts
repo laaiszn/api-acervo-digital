@@ -163,51 +163,72 @@ class Aluno {
      */
     // "async" indica que este método é assíncrono — ele pode "esperar" por operações demoradas (como banco de dados)
     // Retorna uma Promise que, quando resolvida, contém um Array de AlunoDTO ou null
-    static async listarAlunos(): Promise<Array<AlunoDTO> | null> {
-        // Cria uma lista vazia que vai receber os alunos encontrados no banco
-        let listaDeAlunos: Array<AlunoDTO> = [];
+    /**
+ * Lista todos os alunos com status ativo no banco de dados.
+ * 
+ * @returns Promise com array de AlunoDTO em caso de sucesso, ou null em caso de erro.
+ * 
+ * Boas práticas aplicadas:
+ * - Substituímos forEach + push por map(), reduzindo a verbosidade e evitando mutação desnecessária de array
+ * - Usamos SELECT explícito em vez de SELECT *, evitando trazer colunas desnecessárias e melhorando performance
+ * - Substituímos console.log por console.error no catch, que é o canal correto para erros
+ * - Tipamos o parâmetro do map com a interface correta em vez de "any"
+ */
+static async listarAlunos(): Promise<Array<AlunoDTO> | null> {
+  try {
+    // ✅ MELHORIA: SELECT explícito ao invés de SELECT *
+    // Motivo: buscar apenas as colunas necessárias reduz o tráfego de dados entre banco e aplicação,
+    // melhora a performance em tabelas com muitas colunas e torna o código mais legível e previsível.
+    const querySelectAluno = `
+      SELECT
+        id_aluno,
+        ra,
+        nome,
+        sobrenome,
+        data_nascimento,
+        endereco,
+        email,
+        celular,
+        status_aluno
+      FROM Aluno
+      WHERE status_aluno = TRUE;
+    `;
 
-        try {
-            // Bloco try: tenta executar o código; se algo der errado, vai para o catch
+    // Executa a query e aguarda o retorno do banco.
+    // "await" pausa a execução aqui até a Promise ser resolvida.
+    const respostaBD = await database.query(querySelectAluno);
 
-            // Define a query SQL que busca todos os alunos ativos no banco de dados
-            const querySelectAluno = `SELECT * FROM Aluno WHERE status_aluno = TRUE;`;
+    // ✅ MELHORIA: map() no lugar de forEach + push
+    // Motivo: map() é declarativo — ele transforma cada item de um array em outro,
+    // retornando um novo array diretamente. Não precisamos criar uma variável vazia
+    // e ir empurrando itens nela, o que tornava o código mais verboso e imperativo.
+    //
+ 
+    const listaDeAlunos: Array<AlunoDTO> = respostaBD.rows.map((aluno: any): AlunoDTO => ({
+      id_aluno:        aluno.id_aluno,
+      ra:              aluno.ra,
+      nome:            aluno.nome,
+      sobrenome:       aluno.sobrenome,
+      data_nascimento: aluno.data_nascimento,
+      endereco:        aluno.endereco,
+      email:           aluno.email,
+      celular:         aluno.celular,
+      status_aluno:    aluno.status_aluno,
+    }));
 
-            // Executa a query no banco de dados e aguarda o resultado
-            // "await" pausa a execução aqui até o banco responder
-            const respostaBD = await database.query(querySelectAluno);
+    // Retorna a lista de alunos mapeada
+    return listaDeAlunos;
 
-            // Percorre cada linha retornada pelo banco de dados
-            // "aluno" é o apelido dado a cada linha individual retornada
-            respostaBD.rows.forEach((aluno: any) => {
+  } catch (error) {
+    // ✅ MELHORIA: console.error ao invés de console.log
+    // Motivo: erros devem ser logados no canal correto (stderr), não no canal de saída padrão (stdout).
+    // Isso facilita a separação de logs em ferramentas de monitoramento (ex: Datadog, CloudWatch).
+    console.error(`Erro ao listar alunos: ${error}`);
 
-                // Cria um objeto AlunoDTO com os dados de cada linha do banco
-                // AlunoDTO é apenas um objeto simples de dados (sem métodos), diferente da classe Aluno
-                const alunoDTO: AlunoDTO = {
-                    id_aluno: aluno.id_aluno,               // ID do aluno
-                    ra: aluno.ra,                           // Registro Acadêmico
-                    nome: aluno.nome,                       // Nome
-                    sobrenome: aluno.sobrenome,             // Sobrenome
-                    data_nascimento: aluno.data_nascimento, // Data de nascimento
-                    endereco: aluno.endereco,               // Endereço
-                    email: aluno.email,                     // E-mail
-                    celular: aluno.celular,                 // Celular
-                    status_aluno: aluno.status_aluno        // Status ativo/inativo
-                };
-
-                // Adiciona o objeto AlunoDTO à lista
-                listaDeAlunos.push(alunoDTO);
-            });
-
-            // Retorna a lista com todos os alunos encontrados
-            return listaDeAlunos;
-        } catch (error) {
-            // Se ocorrer qualquer erro durante a consulta, exibe no console para facilitar o debug
-            console.log(`Erro ao acessar o modelo: ${error}`);
-            // Retorna null para indicar que houve falha
-            return null;
-        }
-    }
+    // Retorna null para sinalizar falha ao chamador
+    return null;
+  }
+}
 
     /**
      * Retorna as informações de um aluno informado pelo ID
