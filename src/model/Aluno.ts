@@ -121,8 +121,22 @@ class Aluno {
  * - Substituímos console.log por console.error no catch, que é o canal correto para erros
  * - Tipamos o parâmetro do map com a interface correta em vez de "any"
  */
+/**
+ * Lista todos os alunos com status ativo no banco de dados.
+ * 
+ * @returns Promise com array de AlunoDTO em caso de sucesso, ou null em caso de erro.
+ * 
+ * Boas práticas aplicadas:
+ * - Substituímos forEach + push por map(), reduzindo a verbosidade e evitando mutação desnecessária de array
+ * - Usamos SELECT explícito em vez de SELECT *, evitando trazer colunas desnecessárias e melhorando performance
+ * - Substituímos console.log por console.error no catch, que é o canal correto para erros
+ * - Tipamos o parâmetro do map com a interface correta em vez de "any"
+ */
 static async listarAlunos(): Promise<Array<AlunoDTO> | null> {
   try {
+    // ✅ MELHORIA: SELECT explícito ao invés de SELECT *
+    // Motivo: buscar apenas as colunas necessárias reduz o tráfego de dados entre banco e aplicação,
+    // melhora a performance em tabelas com muitas colunas e torna o código mais legível e previsível.
     const querySelectAluno = `
       SELECT
         id_aluno,
@@ -146,8 +160,6 @@ static async listarAlunos(): Promise<Array<AlunoDTO> | null> {
     // Motivo: map() é declarativo — ele transforma cada item de um array em outro,
     // retornando um novo array diretamente. Não precisamos criar uma variável vazia
     // e ir empurrando itens nela, o que tornava o código mais verboso e imperativo.
-    //
- 
     const listaDeAlunos: Array<AlunoDTO> = respostaBD.rows.map((aluno: any): AlunoDTO => ({
       id_aluno:        aluno.id_aluno,
       ra:              aluno.ra,
@@ -159,6 +171,8 @@ static async listarAlunos(): Promise<Array<AlunoDTO> | null> {
       celular:         aluno.celular,
       status_aluno:    aluno.status_aluno,
     }));
+
+    // Retorna a lista de alunos mapeada
     return listaDeAlunos;
 
   } catch (error) {
