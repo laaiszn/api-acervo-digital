@@ -30,4 +30,4 @@ Content-Type: application/json
 }
 
 ###
-DELETE http://localhost:3333/api/alunos/2
+DELETE http://localhost:3333/api/alunos/5
