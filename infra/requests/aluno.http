@@ -1,20 +1,20 @@
 GET http://localhost:3333/api/alunos
 
 ###
-GET http://localhost:3333/api/alunos/5
+GET http://localhost:3333/api/alunos/25
 
 ###
 POST http://localhost:3333/api/alunos
 Content-Type: application/json
 
-{
-  "nome": "Joselito",
-  "sobrenome": "Santos",
-  "data_nascimento": "2003-07-10T03:00:00.000Z",
-  "endereco": "Rua do Ingá, 811",
-  "email": "joselito@semnocao.com",
-  "celular": "16991915545"
-}
+ {
+    "nome": "Lais",
+    "sobrenome": "Zanqueta",
+    "data_nascimento": "2006-03-15",
+    "endereco": "Rua das Flores, 123",
+    "email": "lais.zanqueta@email.com",
+    "celular": "+5516991111111"
+  }
 
 ###
 PUT http://localhost:3333/api/alunos/3
