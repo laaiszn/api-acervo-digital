@@ -194,6 +194,10 @@ static async listarAlunos(): Promise<Array<AlunoDTO> | null> {
     // Recebe o ID do aluno como parâmetro e retorna um AlunoDTO ou null
 static async listarAluno(id_aluno: number): Promise<AlunoDTO | null> {
     try {
+        // ✅ MELHORIA: SELECT explícito ao invés de SELECT *
+        // Buscar apenas as colunas necessárias reduz o tráfego de dados entre
+        // banco e aplicação, melhora a performance em tabelas com muitas colunas
+        // e torna o contrato da query claro — quem ler sabe exatamente o que vem do banco.
         const querySelectAluno = `
             SELECT
                 id_aluno,
@@ -209,16 +213,28 @@ static async listarAluno(id_aluno: number): Promise<AlunoDTO | null> {
             WHERE id_aluno = $1;
         `;
 
+        // O "$1" é um prepared statement — protege contra SQL Injection,
+        // pois o banco trata o valor como dado, nunca como código.
         const respostaBD = await database.query(querySelectAluno, [id_aluno]);
 
+        // ✅ MELHORIA: verificação explícita antes de acessar rows[0]
+        // Sem essa checagem, se o id não existir no banco, rows[0] seria undefined
+        // e o retorno abaixo lançaria um TypeError silencioso.
         if (respostaBD.rows.length === 0) {
             return null;
         }
 
+        // ✅ MELHORIA: retorno direto com "as AlunoDTO" ao invés de montar o objeto manualmente
+        // O banco já retorna as colunas com os mesmos nomes definidos no SELECT,
+        // que batem exatamente com os campos do AlunoDTO.
+        // Montar o objeto campo a campo era repetição desnecessária.
         return respostaBD.rows[0] as AlunoDTO;
 
     } catch (error) {
-        console.error(`Erro ao buscar aluno de id ${id_aluno}: ${error}`);
+        // ✅ MELHORIA: console.error com o id_aluno ao invés de console.log genérico
+        // console.error envia para o canal correto (stderr).
+        // Incluir o id facilita rastrear qual busca falou nos logs.
+        console.error(`Erro ao listar aluno de id ${id_aluno}: ${error}`);
         return null;
     }
 }
@@ -229,126 +245,159 @@ static async listarAluno(id_aluno: number): Promise<AlunoDTO | null> {
     * @returns Boolean indicando se o cadastro foi bem-sucedido
     */
     // Recebe um objeto Aluno completo e tenta inseri-lo no banco de dados
-    static async cadastrarAluno(aluno: Aluno): Promise<boolean> {
+static async cadastrarAluno(aluno: Aluno): Promise<boolean> {
     try {
         const queryInsertAluno = `
             INSERT INTO Aluno (nome, sobrenome, data_nascimento, endereco, email, celular)
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING id_aluno;
         `;
+        // ✅ MELHORIA: RETURNING id_aluno ao invés de uma segunda query de verificação
+        // Após o INSERT, pedimos ao banco que retorne o ID gerado.
+        // Isso confirma que o registro foi criado sem precisar de um SELECT adicional,
+        // economizando uma ida e volta ao banco.
 
         const result = await database.query(queryInsertAluno, [
-            aluno.getNome().toUpperCase(),
-            aluno.getSobrenome().toUpperCase(),
+            aluno.getNome().toUpperCase(),      // Nome padronizado em maiúsculas
+            aluno.getSobrenome().toUpperCase(), // Sobrenome padronizado em maiúsculas
             aluno.getDataNascimento(),
-            aluno.getEndereco().toUpperCase(),
-            aluno.getEmail().toLowerCase(),
+            aluno.getEndereco().toUpperCase(),  // Endereço padronizado em maiúsculas
+            aluno.getEmail().toLowerCase(),     // E-mail padronizado em minúsculas
             aluno.getCelular()
         ]);
 
-        if (result.rows.length > 0) {
-            console.log(`Aluno cadastrado com sucesso. ID: ${result.rows[0].id_aluno}`);
-            return true;
-        }
+        // ✅ MELHORIA: retorno direto da expressão booleana ao invés de if/else
+        // "result.rows.length > 0" já é um booleano.
+        // Usar if (result.rows.length > 0) { return true } return false é redundante,
+        // pois estamos apenas transformando um booleano em outro booleano.
+        return result.rows.length > 0;
 
-        return false;
     } catch (error) {
+        // ✅ MELHORIA: console.error ao invés de console.log
+        // Erros devem ser enviados ao canal correto (stderr),
+        // facilitando a separação de logs em ferramentas de monitoramento.
         console.error(`Erro ao cadastrar aluno: ${error}`);
         return false;
     }
 }
 
-    /**
-    * Remove um aluno do banco de dados
-    * @param id_aluno ID do aluno a ser removido
-    * @returns Boolean indicando se a remoção foi bem-sucedida
-   */
-    // Recebe o ID do aluno e realiza uma "remoção lógica" (não apaga do banco, apenas desativa)
-    static async removerAluno(id_aluno: number): Promise<boolean> {
-        try {
-            // Busca o aluno no banco antes de tentar remover, para verificar se ele existe e está ativo
-            const aluno: AlunoDTO | null = await this.listarAluno(id_aluno);
+static async removerAluno(id_aluno: number): Promise<boolean> {
+    // ✅ MELHORIA: conexão dedicada do pool para uso da transação
+    // database.query() usa uma conexão aleatória do pool a cada chamada.
+    // Para transações, precisamos de uma conexão fixa — todas as queries
+    // devem rodar na mesma conexão para que o BEGIN/COMMIT funcione corretamente.
+    const client = await database.connect();
 
-            // Só prossegue se o aluno existir (não for null) E estiver com status ativo (true)
-            if (aluno && aluno.status_aluno) {
-                // Query que desativa todos os empréstimos relacionados ao aluno
-                // Em vez de apagar, usa UPDATE para setar o status como FALSE (remoção lógica)
-                const queryDeleteEmprestimoAluno = `UPDATE emprestimo 
-                                                    SET status_emprestimo_registro = FALSE
-                                                    WHERE id_aluno=$1;`;
+    try {
+        const aluno: AlunoDTO | null = await this.listarAluno(id_aluno);
 
-                // Executa a desativação dos empréstimos do aluno
-                await database.query(queryDeleteEmprestimoAluno, [id_aluno]);
-
-                // Query que desativa o próprio aluno (também uma remoção lógica)
-                const queryDeleteAluno = `UPDATE aluno 
-                                        SET status_aluno = FALSE
-                                        WHERE id_aluno=$1;`;
-
-                // Executa a desativação do aluno e armazena o resultado
-                const result = await database.query(queryDeleteAluno, [id_aluno]);
-
-                // "rowCount" indica quantas linhas foram afetadas pelo UPDATE
-                // Se for diferente de 0, significa que o aluno foi desativado com sucesso
-                return true;
-            }
-
-            // Se o aluno não existir ou já estiver inativo, retorna false
-            return false;
-
-        } catch (error) {
-            // Exibe o erro no console e retorna false em caso de falha
-            console.log(`Erro na consulta: ${error}`);
+        // ✅ MELHORIA: early return com condição invertida
+        // Saímos cedo se o aluno não existir ou já estiver inativo,
+        // evitando aninhamento desnecessário no restante do código.
+        if (!aluno || !aluno.status_aluno) {
             return false;
         }
-    }
 
+        // ✅ MELHORIA: transação com BEGIN / COMMIT / ROLLBACK
+        // O código anterior executava duas queries independentes.
+        // Se a segunda falhasse, o banco ficaria inconsistente:
+        // empréstimos desativados, mas o aluno ainda ativo.
+        // Com a transação, as duas operações são atômicas:
+        // ou as duas acontecem juntas, ou nenhuma acontece.
+        await client.query("BEGIN");
+
+        await client.query(
+            `UPDATE emprestimo
+             SET status_emprestimo_registro = FALSE
+             WHERE id_aluno = $1;`,
+            [id_aluno]
+        );
+
+        await client.query(
+            `UPDATE aluno
+             SET status_aluno = FALSE
+             WHERE id_aluno = $1;`,
+            [id_aluno]
+        );
+
+        // Confirma as alterações — só aqui as mudanças ficam permanentes no banco
+        await client.query("COMMIT");
+
+        return true;
+
+    } catch (error) {
+        // Se qualquer query falhar, o ROLLBACK desfaz tudo que foi feito desde o BEGIN
+        await client.query("ROLLBACK");
+        console.error(`Erro ao remover aluno de id ${id_aluno}: ${error}`);
+        return false;
+
+    } finally {
+        // ✅ MELHORIA: finally com client.release()
+        // O bloco finally executa sempre, independente de sucesso ou erro.
+        // Sem isso, uma falha poderia deixar a conexão ocupada indefinidamente,
+        // esgotando o pool e travando toda a aplicação.
+        client.release();
+    }
+}
     /**
     * Atualiza os dados de um aluno no banco de dados.
     * @param aluno Objeto do tipo Aluno com os novos dados
     * @returns true caso sucesso, false caso erro
     */
     // Recebe um objeto Aluno com os dados atualizados e os salva no banco
-   static async atualizarAluno(aluno: Aluno): Promise<boolean> {
+static async atualizarAluno(aluno: Aluno): Promise<boolean> {
     try {
-        const alunoConsulta: AlunoDTO | null = await this.listarAluno(aluno.id_aluno);
+        // ✅ MELHORIA: aluno.id_aluno → aluno.getIdAluno()
+        // O atributo id_aluno é privado na classe Aluno.
+        // Acessar atributos privados diretamente viola o encapsulamento do TypeScript.
+        // O getter é a forma correta e segura de obter esse valor.
+        const alunoConsulta: AlunoDTO | null = await this.listarAluno(aluno.getIdAluno());
 
-        if (alunoConsulta && alunoConsulta.status_aluno) {
-            const queryAtualizarAluno = `
-                UPDATE Aluno SET
-                    nome = $1,
-                    sobrenome = $2,
-                    data_nascimento = $3,
-                    endereco = $4,
-                    celular = $5,
-                    email = $6
-                WHERE id_aluno = $7
-            `;
-
-            const respostaBD = await database.query(queryAtualizarAluno, [
-                aluno.getNome().toUpperCase(),
-                aluno.getSobrenome().toUpperCase(),
-                aluno.getDataNascimento(),
-                aluno.getEndereco().toUpperCase(),
-                aluno.getCelular(),
-                aluno.getEmail().toLowerCase(),
-                aluno.id_aluno
-            ]);
-
-            if (respostaBD.rowCount != 0) {
-                return true;
-            }
+        // ✅ MELHORIA: early return com condição invertida
+        // Ao invés de aninhar todo o código dentro de um if,
+        // saímos cedo quando a condição não é atendida.
+        // Isso reduz o nível de indentação e torna o fluxo mais legível.
+        if (!alunoConsulta || !alunoConsulta.status_aluno) {
+            return false;
         }
 
-        return false;
+        const queryAtualizarAluno = `
+            UPDATE Aluno SET
+                nome            = $1,
+                sobrenome       = $2,
+                data_nascimento = $3,
+                endereco        = $4,
+                celular         = $5,
+                email           = $6
+            WHERE id_aluno = $7;
+        `;
+
+        const respostaBD = await database.query(queryAtualizarAluno, [
+            aluno.getNome().toUpperCase(),
+            aluno.getSobrenome().toUpperCase(),
+            aluno.getDataNascimento(),
+            aluno.getEndereco().toUpperCase(),
+            aluno.getCelular(),
+            aluno.getEmail().toLowerCase(),
+            aluno.getIdAluno()
+        ]);
+
+        // ✅ MELHORIA: (respostaBD.rowCount ?? 0) > 0 ao invés de respostaBD.rowCount != 0
+        // O tipo do rowCount no driver pg é "number | null".
+        // Se for null e compararmos direto com != 0, o resultado pode ser inesperado.
+        // O operador "??" garante que, se rowCount for null, usamos 0 como valor padrão.
+        return (respostaBD.rowCount ?? 0) > 0;
+
     } catch (error) {
-        console.log(`Erro na consulta: ${error}`);
+        // ✅ MELHORIA: console.error com id do aluno ao invés de console.log genérico
+        // console.error envia para o canal correto (stderr).
+        // Incluir o id facilita identificar qual atualização falhou nos logs.
+        console.error(`Erro ao atualizar aluno de id ${aluno.getIdAluno()}: ${error}`);
         return false;
     }
 }
-
 }
 
 
-// Exporta a classe Aluno para que possa ser importada e usada em outros arquivos do projeto
+
 export default Aluno;
