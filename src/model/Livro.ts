@@ -154,7 +154,7 @@ class Livro {
             FROM Livro
             WHERE status_livro = TRUE;
         `;
-
+        
         const respostaBD = await database.query(querySelectLivro);
 
         // ✅ MELHORIA: map() ao invés de forEach + push em lista mutável
