@@ -1,7 +1,7 @@
 GET http://localhost:3333/api/alunos
 
 ###
-GET http://localhost:3333/api/alunos/4
+GET http://localhost:3333/api/alunos/5
 
 ###
 POST http://localhost:3333/api/alunos

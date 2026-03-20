@@ -1,7 +1,7 @@
 GET http://localhost:3333/api/emprestimos
 
 ###
-GET http://localhost:3333/api/emprestimos/25
+GET http://localhost:3333/api/emprestimos/5
 
 ###
 POST http://localhost:3333/api/emprestimos
@@ -16,7 +16,7 @@ Content-Type: application/json
 }
 
 ###
-PUT http://localhost:3333/api/emprestimos/25
+PUT http://localhost:3333/api/emprestimos/5
 Content-Type: application/json
 
 {
