@@ -1,14 +1,8 @@
-// Importa a classe Aluno do model — é daqui que vêm os métodos de acesso ao banco de dados
 import Aluno from "../model/Aluno.js";
-// Importa os tipos Request e Response do Express — representam a requisição e a resposta HTTP
-// "type" indica que é uma importação apenas de tipo (só existe em tempo de compilação, não gera código JS)
 import { type Request, type Response } from "express";
-// Importa o tipo AlunoDTO para tipar os dados recebidos do front-end
 import type AlunoDTO from "../dto/AlunoDTO.js";
 
-// Define a classe AlunoController que HERDA da classe Aluno
-// Isso permite que o controller acesse diretamente os métodos estáticos do model (listarAlunos, cadastrarAluno, etc.)
-// A arquitetura MVC separa responsabilidades: o Model cuida do banco, o Controller cuida das requisições HTTP
+
 class AlunoController extends Aluno {
 
     /**
@@ -17,17 +11,13 @@ class AlunoController extends Aluno {
      * @param res Objeto de resposta HTTP.
      * @returns Lista de alunos em formato JSON.
      */
-    // Método estático e assíncrono — recebe a requisição HTTP e devolve a resposta com todos os alunos
     static async todos(req: Request, res: Response) {
         try {
-            // Chama o método herdado do model Aluno para buscar todos os alunos ativos no banco
+    
             const listaDeAlunos = await Aluno.listarAlunos();
-            // Retorna a lista em formato JSON com status HTTP 200 (OK — requisição bem-sucedida)
             res.status(200).json(listaDeAlunos);
         } catch (error) {
-            // Se ocorrer qualquer erro, exibe os detalhes no console do servidor para facilitar o debug
             console.log(`Erro ao acessar método herdado: ${error}`);
-            // Retorna uma mensagem de erro em JSON com status HTTP 500 (Internal Server Error)
             res.status(500).json("Erro ao recuperar as informações do aluno.");
         }
     }
@@ -38,21 +28,14 @@ class AlunoController extends Aluno {
      * @param res Objeto de resposta HTTP.
      * @returns Informações de aluno em formato JSON.
      */
-    // Método que busca um único aluno com base no ID informado na URL (ex: GET /aluno/5)
+
     static async aluno(req: Request, res: Response) {
         try {
-            // Lê o parâmetro "id" da URL (req.params.id) e converte de string para número inteiro
-            // O "as string" garante ao TypeScript que o valor existe e é uma string
             const idAluno = parseInt(req.params.id as string);
-
-            // Chama o método do model passando o ID para buscar o aluno específico no banco
             const aluno = await Aluno.listarAluno(idAluno);
-            // Retorna o objeto do aluno em JSON com status HTTP 200 (OK)
             res.status(200).json(aluno);
         } catch (error) {
-            // Exibe o erro no console do servidor
             console.log(`Erro ao acessar método herdado: ${error}`);
-            // Retorna mensagem de erro com status HTTP 500
             res.status(500).json("Erro ao recuperar as informações do aluno.");
         }
     }
@@ -63,15 +46,10 @@ class AlunoController extends Aluno {
       * @param res Objeto de resposta HTTP.
       * @returns Mensagem de sucesso ou erro em formato JSON.
       */
-    // Método que recebe os dados do front-end e cria um novo aluno no banco de dados
+   
     static async cadastrar(req: Request, res: Response) {
         try {
-            // Lê o corpo (body) da requisição HTTP e o tipifica como AlunoDTO
-            // O front-end envia os dados do novo aluno no corpo da requisição (geralmente em formato JSON)
             const dadosRecebidos: AlunoDTO = req.body;
-
-            // Cria um novo objeto Aluno usando os dados recebidos do front-end
-            // O operador "??" define valores padrão caso os campos opcionais não tenham sido enviados
             const novoAluno = new Aluno(
                 dadosRecebidos.nome,                                      // Nome obrigatório
                 dadosRecebidos.sobrenome,                                 // Sobrenome obrigatório
