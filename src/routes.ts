@@ -2,14 +2,16 @@ import { Router, type Request, type Response } from "express";
 import AlunoController from "./controller/AlunoController.js";
 import LivroController from "./controller/LivroController.js";
 import EmprestimoController from "./controller/EmprestimoController.js";
-import AuthController from "./controller/UsuarioController.js";
-import UsuarioController from "./controller/UsuarioController.js";
+import { Auth } from "./middlewares/Auth.js";
+
 
 const router = Router();
 
 router.get('/', (req: Request, res: Response) => {
     return res.status(200).json(`Aplicação online. Timestamp: ${new Date()}`);
 });
+
+router.post('/api/login', Auth.validacaoUsuario);
 
 router.get('/api/alunos', AlunoController.todos);
 router.get('/api/alunos/:id', AlunoController.aluno);
@@ -28,7 +30,5 @@ router.get('/api/emprestimos/:id', EmprestimoController.emprestimo);
 router.post('/api/emprestimos', EmprestimoController.cadastrar);
 router.delete('/api/emprestimos/:id', EmprestimoController.remover);
 router.put('/api/emprestimos/:id', EmprestimoController.atualizar);
-
-router.post('/api/login', UsuarioController.autenticar);
 
 export { router };
